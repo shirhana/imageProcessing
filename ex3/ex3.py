@@ -97,7 +97,8 @@ def create_laplacian_pyramid(gaussian_pyramid):
         upsampled = cv2.pyrUp(gaussian_pyramid[i + 1], dstsize=size)
         laplacian = cv2.subtract(gaussian_pyramid[i], upsampled)
         laplacian_pyramid.append(laplacian)
-    laplacian_pyramid.append(gaussian_pyramid[-1])  # Add the smallest level
+
+    laplacian_pyramid.append(gaussian_pyramid[-1])  # Add the last level
     return laplacian_pyramid
 
 def blend_pyramids(laplacian_a, laplacian_b, gaussian_mask):
@@ -119,14 +120,14 @@ def reconstruct_from_pyramid(laplacian_pyramid):
         image = cv2.add(image, laplacian_pyramid[i])
     return image
 
-def plot_laplacian_pyramid(laplacian_pyramid):
+def plot_pyramid(pyramid):
     """Plot all levels of a Laplacian pyramid."""
-    levels = len(laplacian_pyramid)
+    levels = len(pyramid)
     plt.figure()
     
     for i in range(levels):
         plt.subplot(1, levels, i+1)
-        plt.imshow(cv2.cvtColor(laplacian_pyramid[i], cv2.COLOR_BGR2RGB))  # Convert to RGB for proper display
+        plt.imshow(cv2.cvtColor(pyramid[i], cv2.COLOR_BGR2RGB))  # Convert to RGB for proper display
         plt.title(f'Level {i}')
         plt.axis('off')
     
@@ -146,18 +147,48 @@ def blend_images(image1, image2, mask, levels=5):
     gaussian_mask = create_gaussian_pyramid(mask, levels)
     laplacian_a = create_laplacian_pyramid(create_gaussian_pyramid(image1, levels))
     laplacian_b = create_laplacian_pyramid(create_gaussian_pyramid(image2, levels))
-
-
-    # plot_laplacian_pyramid(laplacian_a)
+    
     # Blend pyramids and reconstruct the final image
     blended_pyramid = blend_pyramids(laplacian_a, laplacian_b, gaussian_mask)
     blended_image = reconstruct_from_pyramid(blended_pyramid)
-
-    # blended_image = reconstruct_from_pyramid(laplacian_a)
     
     # Clip values to valid range and convert to 8-bit image
     blended_image = np.clip(blended_image, 0, 255).astype(np.uint8)
     return blended_image
+
+
+def hybrid_image_balanced(image1_path, image2_path, sigma1=10, sigma2=20, alpha=0.5, beta=0.5):
+    # Load the images
+    image1 = cv2.imread(image1_path, cv2.IMREAD_COLOR)
+    image2 = cv2.imread(image2_path, cv2.IMREAD_COLOR)
+
+    # Resize images to the same dimensions
+    if image1.shape != image2.shape:
+        image2 = cv2.resize(image2, (image1.shape[1], image1.shape[0]))
+
+    # Convert images to float32
+    image1 = np.float32(image1) / 255.0
+    image2 = np.float32(image2) / 255.0
+
+    # Create low-pass filter for image2
+    low_frequencies = cv2.GaussianBlur(image2, (0, 0), sigmaX=sigma2, sigmaY=sigma2)
+
+    # Create high-pass filter for image1
+    low_pass = cv2.GaussianBlur(image1, (0, 0), sigmaX=sigma1, sigmaY=sigma1)
+    high_frequencies = image1 - low_pass
+
+    # Scale the components
+    high_frequencies *= alpha
+    low_frequencies *= beta
+
+    # Combine low frequencies of image2 with high frequencies of image1
+    hybrid = high_frequencies + low_frequencies
+
+    # Clip values to [0, 1] and convert back to uint8
+    hybrid = np.clip(hybrid, 0, 1)
+    hybrid = (hybrid * 255).astype(np.uint8)
+
+    return hybrid
 
 
 if __name__ == "__main__":
@@ -173,15 +204,31 @@ if __name__ == "__main__":
     resize_img_according_another_img(hanoch_img, monkey_img, resized_image_path=hanoch_resized_img)
     make_non_black_white(image_path=hanoch_mask_path, output_path=mask_path)
     
+    # FIRST TASK
     # Load two images and a mask
-    image1 = cv2.imread(monkey_img)  # First image
-    image2 = cv2.imread(hanoch_img)  # Second image
-    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)  # Mask (grayscale)
+    image1 = cv2.imread(monkey_img).astype(np.float32)  # First image
+    image2 = cv2.imread(hanoch_img).astype(np.float32)  # Second image
+    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE).astype(np.float32)  # Mask (grayscale)
 
     # Blend the images
-    blended = blend_images(image1, image2, mask, levels=5)
+    blended = blend_images(image1, image2, mask, levels=10)
 
     # Show and save the result
-    hanoch_as_monkey_path = "results/hanoch_as_monkey.jpg"
+    hanoch_as_monkey_path = "results/hanoch_as_monkey_1.jpg"
     cv2.imwrite(hanoch_as_monkey_path, blended)
+    print(f"{hanoch_as_monkey_path} created successfully!")
+
+    # SECOND TASK
+    # Parameters: Tune alpha, beta, sigma1, sigma2 for better balance
+    alpha = 0.7  # Weight for high-frequency image1
+    beta = 0.5   # Weight for low-frequency image2
+    sigma1 = 3  # High-pass filter strength
+    sigma2 = 3  # Low-pass filter strength
+
+    # Create hybrid image
+    hybrid_result = hybrid_image_balanced(hanoch_img, monkey_img, sigma1, sigma2, alpha, beta)
+
+    # Save the result
+    hanoch_as_monkey_path = "results/hanoch_as_monkey_2.jpg"
+    cv2.imwrite(hanoch_as_monkey_path, hybrid_result)
     print(f"{hanoch_as_monkey_path} created successfully!")
