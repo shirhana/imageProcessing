@@ -173,140 +173,6 @@ class VideoMosaic:
             cv2.imshow("Warped Frame", warped_img_resized)
 
 
-# def combine_images(image1, image2):
-#     """
-#     Combine two padded images based on the described logic:
-#     - If one has color and the other does not, take the color.
-#     - If both have color, take the color from the first image.
-    
-#     Parameters:
-#         image1 (np.ndarray): First input image.
-#         image2 (np.ndarray): Second input image.
-    
-#     Returns:
-#         np.ndarray: Combined image.
-#     """
-#     # Ensure both images are of the same size
-#     assert image1.shape == image2.shape, "Images must have the same dimensions"
-
-#     # Create a mask for where each image has color (non-zero pixels)
-#     mask1 = np.any(image1 > 0, axis=-1)  # True where image1 has non-zero pixels
-#     mask2 = np.any(image2 > 0, axis=-1)  # True where image2 has non-zero pixels
-
-#     # Initialize the result with the first image
-#     result = image1.copy()
-
-#     # Where image2 has color but image1 does not, take from image2
-#     result[~mask1 & mask2] = image2[~mask1 & mask2]
-
-#     return result
-
-
-# def sort_corners(corners):
-#     """
-#     Sort corners in the specific order: top-left, bottom-left, top-right, bottom-right.
-    
-#     Parameters:
-#         corners (np.ndarray): Detected corners (4x2).
-    
-#     Returns:
-#         sorted_corners (np.ndarray): Corners sorted as [top-left, bottom-left, top-right, bottom-right].
-#     """
-#     # Sort by x-coordinate (left to right)
-#     corners = sorted(corners, key=lambda point: point[0])
-
-#     # Separate into left and right corners
-#     left_corners = corners[:2]  # Two smallest x-coordinates (left)
-#     right_corners = corners[2:] # Two largest x-coordinates (right)
-
-#     # Sort left corners by y-coordinate (top to bottom)
-#     left_corners = sorted(left_corners, key=lambda point: point[1])
-
-#     # Sort right corners by y-coordinate (top to bottom)
-#     right_corners = sorted(right_corners, key=lambda point: point[1])
-
-#     # Combine into the desired order
-#     sorted_corners = np.array([
-#         left_corners[0],  # Top-left
-#         left_corners[1],  # Bottom-left
-#         right_corners[0], # Top-right
-#         right_corners[1]  # Bottom-right
-#     ], dtype=np.float32)
-
-#     return sorted_corners
-
-
-# def detect_rectangle_corners(image):
-#     """
-#     Detect the corners of a rectangular region in an image padded with black.
-    
-#     Parameters:
-#         image (np.ndarray): Input image (may be tilted).
-    
-#     Returns:
-#         corners (np.ndarray): Array of detected corners (4x2).
-#     """
-#     # Convert to grayscale
-#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-#     # Threshold the image
-#     _, binary = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
-
-#     # Find contours
-#     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-#     # Find the largest contour
-#     largest_contour = max(contours, key=cv2.contourArea)
-
-#     # Approximate the contour to a polygon
-#     epsilon = 0.02 * cv2.arcLength(largest_contour, True)
-#     approx = cv2.approxPolyDP(largest_contour, epsilon, True)
-
-#     # Ensure the result has 4 corners (rectangle)
-#     if len(approx) == 4:
-#         corners = approx.reshape(4, 2)
-#         return sort_corners(corners)
-#     else:
-#         raise ValueError("The detected shape is not a rectangle.")
-    
-
-# def take_bidirectional_portion(image, corners, null_right, null_left):
-
-#     # Extract corner coordinates
-#     x1, y1 = corners[0]  # Top-left corner
-#     x2, y2 = corners[1]  # Bottom-left corner
-#     x3, y3 = corners[2]  # Top-right corner
-#     x4, y4 = corners[3]  # Bottom-right corner
-
-#     # Define line equations
-#     top_line = lambda x: ((y3 - y1) / (x3 - x1)) * (x - x1) + y1
-#     bottom_line = lambda x: ((y4 - y2) / (x4 - x2)) * (x - x2) + y2
-
-#     new_top_left_x = x1 + (x3 - x1) * (1 - null_right)
-#     new_top_left_y = top_line(new_top_left_x)
-#     new_top_left = (new_top_left_x, new_top_left_y)
-
-#     new_bottom_left_x = x2 + (x4 - x2) * (1 - null_right)
-#     new_bottom_left_y = bottom_line(new_bottom_left_x)
-#     new_bottom_left = (new_bottom_left_x, new_bottom_left_y)
-
-#     new_top_right_x = x3 - (x3 - x1) * (1 - null_left)
-#     new_top_right_y = top_line(new_top_right_x)
-#     new_top_right = (new_top_right_x, new_top_right_y)
-
-#     new_bottom_right_x = x4 - (x4 - x2) * (1 - null_left)
-#     new_bottom_right_y = bottom_line(new_bottom_right_x)
-#     new_bottom_right = (new_bottom_right_x, new_bottom_right_y)
-
-#     # Create mask and apply
-#     mask = np.zeros_like(image, dtype=np.uint8)
-#     polygon = np.array([new_top_left, new_bottom_left, new_bottom_right, new_top_right], dtype=np.int32)
-#     mask = cv2.fillPoly(mask, [polygon], (255, 255, 255))
-#     masked_image = cv2.bitwise_and(image, mask)
-
-#     return masked_image
-
-
 def combine_images(img1, img2):
     """
     Combines two images, prioritizing color information from the first image.
@@ -358,10 +224,10 @@ def detect_rectangle_corners(image):
     largest_contour = max(contours, key=cv2.contourArea)
     epsilon = 0.02 * cv2.arcLength(largest_contour, True)
     approx = cv2.approxPolyDP(largest_contour, epsilon, True)
-    if len(approx) == 4:
-        return sort_corners(approx.reshape(4, 2))
-    else:
-        raise ValueError("The detected shape is not a rectangle.")
+     # Ensure approx has 4 points
+    if len(approx) > 4:
+        approx = approx[:4]
+    return sort_corners(approx.reshape(4, 2))
 
 def extract_region(image, corners, null_right, null_left):
     """
@@ -450,7 +316,6 @@ def execute_for_viewpoint(video_mosaic, canvases, num_frames):
         # Find range of frames that have at least 500 non-zero pixels in the current portion of the canvas
         flag = False
         last_bottom_left_x = None
-        print(f"i = {i}")
         for j in range(0,len(video_mosaic.canvas),5):
             # Count non-zero pixels in the current range
             corners = detect_rectangle_corners(video_mosaic.canvas[j])
@@ -477,7 +342,7 @@ def execute_for_viewpoint(video_mosaic, canvases, num_frames):
             canvases[i] = combine_images(canvases[i], window)
 
     # Visualize the panoramas after processing
-    visualize_panoramas(canvases, num_frames)
+    # visualize_panoramas(canvases, num_frames)
 
     return canvases
 
@@ -558,13 +423,12 @@ def execute_for_dynamic(video_mosaic, canvases, num_frames):
         final_mosaic = combine_images(final_mosaic, canvas)
 
     # Visualize the final mosaic with focus and excluded regions
-    visualize_dynamic_mosaic(final_mosaic, focus_mask, excluded_mask)
+    # visualize_dynamic_mosaic(final_mosaic, focus_mask, excluded_mask)
 
     return canvases
 
 
-def create_images_per_frames(video_path, images_folder, final_image_prefix, execution_type, init_offset):
-    print(f"execution_type: {execution_type}")
+def create_images_per_frames(video_path, images_folder, final_image_prefix, execution_type, init_offset, visualize):
     cap = cv2.VideoCapture(video_path)
     is_first_frame = True
     video_mosaic = None
@@ -577,7 +441,7 @@ def create_images_per_frames(video_path, images_folder, final_image_prefix, exec
             break
 
         if is_first_frame:
-            video_mosaic = VideoMosaic(frame_cur, init_offset=init_offset, visualize=False)
+            video_mosaic = VideoMosaic(frame_cur, init_offset=init_offset, visualize=visualize)
             is_first_frame = False
             continue
 
@@ -592,10 +456,8 @@ def create_images_per_frames(video_path, images_folder, final_image_prefix, exec
     canvases = [np.zeros_like(video_mosaic.canvas[0]) for _ in range(num_frames)]
 
     if execution_type == DYNAMIC_VIDEO:
-        print(f"yoy")
         canvases = execute_for_dynamic(video_mosaic, canvases, num_frames)
     else: 
-        print(f"yey")
         canvases = execute_for_viewpoint(video_mosaic, canvases, num_frames)
 
     # Make canvases a video
@@ -634,9 +496,8 @@ def create_video(images_prefix, image_folder, output_video_name, fps=10):
     video_writer.release()
 
 
-def execute_stereo_mosaicing(video_input_file, video_output_file, images_folder, image_prefix, init_offset, execution_type=DYNAMIC_VIDEO):
-    print(f"here")
-    create_images_per_frames(video_path=video_input_file, images_folder=images_folder, final_image_prefix=image_prefix, execution_type=execution_type, init_offset=init_offset)
+def execute_stereo_mosaicing(video_input_file, video_output_file, images_folder, image_prefix, init_offset, execution_type=DYNAMIC_VIDEO, visualize=False):
+    create_images_per_frames(video_path=video_input_file, images_folder=images_folder, final_image_prefix=image_prefix, execution_type=execution_type, init_offset=init_offset, visualize=visualize)
     create_video(images_prefix=image_prefix, image_folder=images_folder, output_video_name=video_output_file)
     print(f"{video_output_file} created successfully!\nExecution Type: {execution_type}")
 
@@ -647,20 +508,20 @@ if __name__ == "__main__":
 
     execute_stereo_mosaicing(
         video_input_file="inputs/Iguazu.mp4", 
-        video_output_file=f"outputs/Iguazu_output44.mp4", 
+        video_output_file=f"outputs/Iguazu_output.mp4", 
         images_folder=images_folder, 
-        init_offset=20,
+        init_offset=20, # this video is from left to right so init with 20 as offset
         image_prefix="mosaic_iguazu_", 
-        execution_type=DYNAMIC_VIDEO
+        execution_type=DYNAMIC_VIDEO,
+        visualize=True # decide if want to debug with visualization in RUN TIME
     )
     execute_stereo_mosaicing(
         video_input_file="inputs/Kessaria.mp4", 
-        video_output_file=f"outputs/Kessaria_output44.mp4", 
+        video_output_file=f"outputs/Kessaria_output.mp4", 
         images_folder=images_folder, 
-        init_offset=3000,
+        init_offset=3000, # this video is from right to left so init with 3000 as offset
         image_prefix="mosaic_kessaria_", 
-        execution_type=VIEWPOINT_VIDEO
+        execution_type=VIEWPOINT_VIDEO,
+        visualize=True # decide if want to debug with visualization in RUN TIME
     )
-
-    
     
